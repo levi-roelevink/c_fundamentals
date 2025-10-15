@@ -8,7 +8,6 @@
 // Goal: "blog/index.html"
 char *to_path(const char *req) {
     const int length = strlen(req);
-
     int startIndex = 0;
     int endIndex = 0;
 
@@ -23,6 +22,10 @@ char *to_path(const char *req) {
             }
             break;
         }
+    }
+
+    if (req[endIndex] == '/') { // In case the URL included '/' at the end
+        endIndex--;
     }
 
     const char *suffix = "/index.html";
