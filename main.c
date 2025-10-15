@@ -3,51 +3,54 @@
 #include <stdlib.h>
 #include <string.h>
 
+const char* DEFAULT_FILE = "index.html";
+
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
 // Goal: "blog/index.html"
-char *to_path(const char *req) {
-    const int length = strlen(req);
-    int startIndex = 0;
-    int endIndex = 0;
+char *to_path(char *req) {
+    char *start, *end;
 
-    for (int i = 0; i < length; i++) {
-        if (req[i] == '/') {
-            startIndex = i + 1;
-            for (int j = startIndex; j < length; j++) {
-                if (req[j] == ' ') {
-                    endIndex = j - 1;
-                    break;
-                }
-            }
-            break;
+    const int length = strlen(req);
+
+    for (start = req; start[0] != ' '; start++) {
+        if (!start[0]) { // End of string / NULL-terminated
+            return NULL;
+        }
+    }
+    start++;
+
+    for (end = start; end[0] != ' '; end++) {
+        if (!end[0]) { // End of string / NULL-terminated
+            return NULL;
         }
     }
 
-    if (req[endIndex] == '/') { // In case the URL included '/' at the end
-        endIndex--;
+    printf("End: %c\n", end[0]);
+    if (end[-1] != '/') {
+        // In case the URL included '/' at the end
+        end[0] = '/';
+        end++;
     }
 
-    const char *suffix = "/index.html";
-    const int pathLength = endIndex - startIndex + 1;
-    const int totalLength = pathLength + strlen(suffix);
-    char *result = malloc(totalLength);
+    printf("Start: %s\n", start);
+    printf("End: %c\n", end[0]);
 
-    // src: pointer to first byte we want to copy
-    strncpy(result, req + startIndex, pathLength);
-    strcat(result, suffix);
-    return result; // Caller must free()
+    // Not enough space to copy in "index.html"
+    if (end + strlen(DEFAULT_FILE) > req + length) {
+        return NULL;
+    }
+
+    // + 1 for size_t to include NULL-terminator
+    memcpy(end, DEFAULT_FILE, strlen(DEFAULT_FILE) + 1);
+
+    // Skip leading '/'
+    return start + 1;
 }
 
 int main() {
-    char *req = "GET /blog HTTP/1.1...";
-    char *path = to_path(req);
-
-    if (path) {
-        printf("Path: %s\n", path);
-        // Frees the memory allocated on the heap by malloc in the to_path function
-        free(path);
-    }
+    char req[] = "GET /blog HTTP/1.1...";
+    printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req));
 
     return 0;
 }
