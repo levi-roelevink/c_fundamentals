@@ -30,7 +30,7 @@ char *to_path(const char *req) {
     const int totalLength = pathLength + strlen(suffix);
     char *result = malloc(totalLength);
 
-    // src: index in memory of first byte we want to copy
+    // src: pointer to first byte we want to copy
     strncpy(result, req + startIndex, pathLength);
     strcat(result, suffix);
     return result; // Caller must free()
