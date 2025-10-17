@@ -10,7 +10,6 @@ const char* DEFAULT_FILE = "index.html";
 // Goal: "blog/index.html"
 char *to_path(char *req) {
     char *start, *end;
-
     const int length = strlen(req);
 
     for (start = req; start[0] != ' '; start++) {
@@ -26,15 +25,11 @@ char *to_path(char *req) {
         }
     }
 
-    printf("End: %c\n", end[0]);
     if (end[-1] != '/') {
         // In case the URL included '/' at the end
         end[0] = '/';
         end++;
     }
-
-    printf("Start: %s\n", start);
-    printf("End: %c\n", end[0]);
 
     // Not enough space to copy in "index.html"
     if (end + strlen(DEFAULT_FILE) > req + length) {
@@ -49,6 +44,8 @@ char *to_path(char *req) {
 }
 
 int main() {
+    // This declaration will result in a variable on the stack, so inside the main function's memory
+    // Declaring like "char *req" would result in it being read-only and on the heap
     char req[] = "GET /blog HTTP/1.1...";
     printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req));
 
