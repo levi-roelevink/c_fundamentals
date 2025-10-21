@@ -48,7 +48,6 @@ char *to_path(char *req) {
 }
 
 char* print_file(const char *path) {
-    printf("Path to open: %s\n", path);
     int fd = open(path, O_RDONLY);
     struct stat metadata;
 
@@ -64,6 +63,7 @@ char* print_file(const char *path) {
     //    Hint 2: Don't forget to `free(buf)` later, to prevent memory leaks.
     // char buf[metadata.st_size + 1];
     char* buf = malloc(metadata.st_size + 1);
+    // TODO: this wil crash if the file size is too large
 
     if (buf == NULL) {
         printf("Allocation failed");
@@ -96,8 +96,10 @@ int main() {
     printf("File contents: %s\n", buf);
     free(buf);
 
-    // char req2[] = "GET /blog HTTP/1.1\nHost: example.com";
-    // print_file(to_path(req2));
+    char req2[] = "GET /blog HTTP/1.1\nHost: example.com";
+    buf = print_file(to_path(req2));
+    printf("File contents: %s\n", buf);
+    free(buf);
 
     return 0;
 }
