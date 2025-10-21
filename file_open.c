@@ -34,6 +34,8 @@ int main() {
         printf("File contents: \"%s\"\n", buffer);
     }
 
+    // fwrite()
+
     close(fd);
 
     return 0;

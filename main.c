@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/fcntl.h>
+#include <sys/stat.h>
 
-const char* DEFAULT_FILE = "index.html";
+const char *DEFAULT_FILE = "index.html";
 
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
@@ -13,14 +15,16 @@ char *to_path(char *req) {
     const int length = strlen(req);
 
     for (start = req; start[0] != ' '; start++) {
-        if (!start[0]) { // End of string / NULL-terminated ('0' or '\0')
+        if (!start[0]) {
+            // End of string / NULL-terminated ('0' or '\0')
             return NULL;
         }
     }
     start++;
 
     for (end = start; end[0] != ' '; end++) {
-        if (!end[0]) { // End of string / NULL-terminated
+        if (!end[0]) {
+            // End of string / NULL-terminated
             return NULL;
         }
     }
@@ -43,20 +47,71 @@ char *to_path(char *req) {
     return start + 1;
 }
 
+char* print_file(const char *path) {
+    printf("Path to open: %s\n", path);
+    int fd = open(path, O_RDONLY);
+    struct stat metadata;
+
+    // This will write 144 bytes of metadata from fd into the metadata object
+    // The '&' gives the address of the first of those 144 bytes
+    // Otherwise the 144 bytes would've been copied to pass as argument
+    if (fstat(fd, &metadata) == -1) {
+        // Error handling
+    }
+
+    // 👉 Change this to `char *` and malloc(). (malloc comes from <stdlib.h>)
+    //    Hint 1: Don't forget to handle the case where malloc returns NULL!
+    //    Hint 2: Don't forget to `free(buf)` later, to prevent memory leaks.
+    // char buf[metadata.st_size + 1];
+    char* buf = malloc(metadata.st_size + 1);
+
+    if (buf == NULL) {
+        printf("Allocation failed");
+        exit(0);
+    }
+
+    ssize_t bytes_read = read(fd, buf, metadata.st_size);
+    if (bytes_read == -1) {
+        // Handle errors
+
+    }
+    buf[bytes_read] = '\0';
+
+    close(fd);
+    return buf;
+
+    // 👉 Go back and add error handling for all the cases above where errors could happen.
+    //    (You can just printf that an error happened.) Some relevant docs:
+    //
+    //    https://www.man7.org/linux/man-pages/man2/open.2.html
+    //    https://www.man7.org/linux/man-pages/man2/stat.2.html
+    //    https://www.man7.org/linux/man-pages/man2/read.2.html
+    //    https://www.man7.org/linux/man-pages/man3/malloc.3.html
+}
+
 int main() {
-    // This declaration will result in a variable on the stack, so inside the main function's memory
-    // Declaring like "char *req" would result in it being read-only and on the heap
-    char req1[] = "GET /blog HTTP/1.1\nHost: example.com";
-    printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req1));
+    char req1[] = "GET / HTTP/1.1\nHost: example.com";
+    char* buf = print_file(to_path(req1));
 
-    char req2[] = "GET /blog/ HTTP/1.1\nHost: example.com";
-    printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req2));
+    printf("File contents: %s\n", buf);
+    free(buf);
 
-    char req3[] = "GET / HTTP/1.1\nHost: example.com";
-    printf("Should be \"index.html\": \"%s\"\n", to_path(req3));
-
-    char req4[] = "GET /blog ";
-    printf("Should be \"(null)\": \"%s\"\n", to_path(req4));
+    // char req2[] = "GET /blog HTTP/1.1\nHost: example.com";
+    // print_file(to_path(req2));
 
     return 0;
 }
+
+// This declaration will result in a variable on the stack, so inside the main function's memory
+// Declaring like "char *req" would result in it being read-only and on the heap
+// char req1[] = "GET /blog HTTP/1.1\nHost: example.com";
+// printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req1));
+//
+// char req2[] = "GET /blog/ HTTP/1.1\nHost: example.com";
+// printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req2));
+//
+// char req3[] = "GET / HTTP/1.1\nHost: example.com";
+// printf("Should be \"index.html\": \"%s\"\n", to_path(req3));
+//
+// char req4[] = "GET /blog ";
+// printf("Should be \"(null)\": \"%s\"\n", to_path(req4));
