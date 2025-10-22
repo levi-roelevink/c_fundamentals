@@ -95,8 +95,7 @@ char *print_file(const char *path) {
 
 int main() {
     char req1[] = "GET / HTTP/1.1\nHost: example.com";
-    // char *buf = print_file(to_path(req1));
-char *buf = print_file("ppooop");
+    char *buf = print_file(to_path(req1));
     printf("File contents: %s\n", buf);
     free(buf);
 
