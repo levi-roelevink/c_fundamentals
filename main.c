@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/errno.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
 
@@ -47,33 +48,36 @@ char *to_path(char *req) {
     return start + 1;
 }
 
-char* print_file(const char *path) {
+char *print_file(const char *path) {
     int fd = open(path, O_RDONLY);
+    if (fd == -1) {
+        printf("Error opening file: \"%s\", error code: %d\n", path, errno);
+    }
+
     struct stat metadata;
 
     // This will write 144 bytes of metadata from fd into the metadata object
     // The '&' gives the address of the first of those 144 bytes
     // Otherwise the 144 bytes would've been copied to pass as argument
     if (fstat(fd, &metadata) == -1) {
-        // Error handling
+        printf("Error retrieving information about file: \"%s\", error code: %d\n", path, errno);
     }
 
     // 👉 Change this to `char *` and malloc(). (malloc comes from <stdlib.h>)
     //    Hint 1: Don't forget to handle the case where malloc returns NULL!
     //    Hint 2: Don't forget to `free(buf)` later, to prevent memory leaks.
     // char buf[metadata.st_size + 1];
-    char* buf = malloc(metadata.st_size + 1);
-    // TODO: this wil crash if the file size is too large
+    char *buf = malloc(metadata.st_size + 1);
+    // TODO: this wil crash if the file size is too large, split the reading up into chunks
 
     if (buf == NULL) {
-        printf("Allocation failed");
+        printf("Error allocating memory on the heap, error code: %d\n", errno);
         exit(0);
     }
 
     ssize_t bytes_read = read(fd, buf, metadata.st_size);
     if (bytes_read == -1) {
-        // Handle errors
-
+        printf("Error reading bytes from file descriptor: \"%s\", error code: %d\n", path, errno);
     }
     buf[bytes_read] = '\0';
 
@@ -91,8 +95,8 @@ char* print_file(const char *path) {
 
 int main() {
     char req1[] = "GET / HTTP/1.1\nHost: example.com";
-    char* buf = print_file(to_path(req1));
-
+    // char *buf = print_file(to_path(req1));
+char *buf = print_file("ppooop");
     printf("File contents: %s\n", buf);
     free(buf);
 
