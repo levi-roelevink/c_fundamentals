@@ -52,6 +52,7 @@ char *print_file(const char *path) {
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
         printf("Error opening file: \"%s\", error code: %d\n", path, errno);
+        return NULL;
     }
 
     struct stat metadata;
@@ -61,6 +62,8 @@ char *print_file(const char *path) {
     // Otherwise the 144 bytes would've been copied to pass as argument
     if (fstat(fd, &metadata) == -1) {
         printf("Error retrieving information about file: \"%s\", error code: %d\n", path, errno);
+        close(fd);
+        return NULL;
     }
 
     // 👉 Change this to `char *` and malloc(). (malloc comes from <stdlib.h>)
@@ -72,25 +75,22 @@ char *print_file(const char *path) {
 
     if (buf == NULL) {
         printf("Error allocating memory on the heap, error code: %d\n", errno);
-        exit(0);
+        close(fd);
+        return NULL;
     }
 
     ssize_t bytes_read = read(fd, buf, metadata.st_size);
     if (bytes_read == -1) {
         printf("Error reading bytes from file descriptor: \"%s\", error code: %d\n", path, errno);
+        close(fd);
+        free(buf);
+        return NULL;
     }
+
     buf[bytes_read] = '\0';
 
     close(fd);
     return buf;
-
-    // 👉 Go back and add error handling for all the cases above where errors could happen.
-    //    (You can just printf that an error happened.) Some relevant docs:
-    //
-    //    https://www.man7.org/linux/man-pages/man2/open.2.html
-    //    https://www.man7.org/linux/man-pages/man2/stat.2.html
-    //    https://www.man7.org/linux/man-pages/man2/read.2.html
-    //    https://www.man7.org/linux/man-pages/man3/malloc.3.html
 }
 
 int main() {
