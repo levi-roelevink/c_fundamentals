@@ -134,14 +134,22 @@ void socket_listen() {
         // Get data from req_socket_fd
         ssize_t bytes_read = read(req_socket_fd, req, MAX_REQUEST_BYTES);
         char *path = to_path(req);
-        int fd = open(path, O_RDONLY); // Read file contents
-        struct stat metadata;
-        fstat(fd, &metadata);
-        char contents[metadata.st_size + 1];
-        read(fd, contents, metadata.st_size + 1);
-        write(1, contents, metadata.st_size + 1);
+        // int fd = open(path, O_RDONLY); // Read file contents
 
-        close(fd);
+        char *response = print_file(path);
+        // Write the requested page to the request socket
+        write(req_socket_fd, response, strlen(response));
+        free(response);
+
+        // struct stat metadata;
+        // fstat(fd, &metadata);
+        // char contents[metadata.st_size + 1];
+        // read(fd, contents, metadata.st_size + 1);
+        // write(1, contents, metadata.st_size + 1);
+        // To make it a real HTTP-server, just write the response to the socket instead of out
+
+
+        // close(fd);
         close(req_socket_fd);
     }
 }
