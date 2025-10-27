@@ -19,6 +19,7 @@ const int PORT = 8080;
 // Input: "GET /blog HTTP/1.1..."
 // Goal: "blog/index.html"
 char *to_path(char *req) {
+    printf("Req: %s\n", req);
     char *start, *end;
     const int length = strlen(req);
 
@@ -46,6 +47,19 @@ char *to_path(char *req) {
     // Not enough space to copy in "index.html"
     if (end + strlen(DEFAULT_FILE) > req + length) {
         return NULL;
+    }
+
+    // TODO: check for file extension
+    int path_length = end - start;
+
+    char *extension = req;
+    for (int i = 0; i < path_length - 1; i++) {
+        printf("Char at i(%d): \"%c\"\n", i, start[i]);
+        if (start[i] == '.') { // Path contains a file extension
+            strncpy(extension, &start[i], path_length - i - 1);
+            extension[path_length - i - 1] = '\0';
+            break;
+        }
     }
 
     // + 1 for size_t to include NULL-terminator
@@ -110,6 +124,7 @@ ssize_t write500(int socket_fd) {
 
 int handle_req(int req_socket_fd, char *req) {
     char *path = to_path(req);
+    printf("Path from to_path: \"%s\"\n", path);
     if (path == NULL) {
         write(req_socket_fd, ERR_400, strlen(ERR_400));
         return -1;
