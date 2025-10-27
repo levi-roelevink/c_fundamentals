@@ -9,8 +9,11 @@
 
 const char *DEFAULT_FILE = "index.html";
 const int MAX_REQUEST_BYTES = 32768;
-const char *SERVER_ERROR = "HTTP/1.1 500 Internal Server Error\n\n";
-const char *BAD_REQUEST = "HTTP/1.1 400 Bad Request\n\n";
+const char *ERR_400 = "HTTP/1.1 400 Bad Request\n\n";
+const char *ERR_404 = "HTTP/1.1 404 Not Found\n\n";
+const char *ERR_413 = "HTTP/1.1 413 Content Too Large\n\n";
+const char *ERR_500 = "HTTP/1.1 500 Internal Server Error\n\n";
+const int PORT = 8080;
 
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
@@ -101,25 +104,94 @@ char *print_file(const char *path) {
     return buf;
 }
 
+ssize_t write500(int socket_fd) {
+    return write(socket_fd, ERR_500, strlen(ERR_500));
+}
+
+int handle_req(int req_socket_fd, char *req) {
+    char *path = to_path(req);
+    if (path == NULL) {
+        write(req_socket_fd, ERR_400, strlen(ERR_400));
+        return -1;
+    }
+
+    int fd = open(path, O_RDONLY); // Read file contents
+    if (fd == -1) {
+        if (errno == ENOENT) {
+            write(req_socket_fd, ERR_404, strlen(ERR_404));
+        } else {
+            write500(req_socket_fd);
+        }
+        close(fd);
+        return -1;
+    }
+
+    struct stat metadata;
+    if (fstat(fd, &metadata) == -1) {
+        write500(req_socket_fd);
+        close(fd);
+        return -1;
+    }
+
+    char *buffer = malloc(metadata.st_size + 1);
+    if (buffer == NULL) {
+        write500(req_socket_fd);
+        close(fd);
+        return -1;
+    }
+
+    ssize_t bytes_read = read(fd, buffer, metadata.st_size + 1);
+    if (bytes_read == -1) {
+        write500(req_socket_fd);
+        close(fd);
+        free(buffer);
+        return -1;
+    }
+
+    char *http_header = "HTTP/1.1 200 OK\n\n";
+    write(req_socket_fd, http_header, strlen(http_header));
+    // Write the requested page to the request socket
+    write(req_socket_fd, buffer, strlen(buffer));
+
+    int bytes_written = strlen(http_header) + strlen(buffer);
+
+    free(buffer);
+    close(fd);
+    return bytes_written;
+}
+
 void socket_listen() {
     // AF_INET specifies IPv4, SOCK_STREAM specifies TCP, 0 is the protocol number
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_fd == -1) {
+        printf("Opening socket failed.\n");
+        return;
+    }
 
     int opt = 1;
-    setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+        printf("Setting socket options failed.\n");
+        return;
+    }
 
     struct sockaddr_in address; // IPv4
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8080);
+    address.sin_port = htons(PORT);
 
     // Bind the info going to the port 8080 to the socket
-    bind(socket_fd, (struct sockaddr *) &address, sizeof(address));
+    if (bind(socket_fd, (struct sockaddr *) &address, sizeof(address)) == -1) {
+        printf("Binding socket to port %d failed.\n", PORT);
+        return;
+    }
 
     // '4' is the number of pending connections that can stack up before we start refusing new ones
-    listen(socket_fd, 4);
+    if (listen(socket_fd, 4) == -1) {
+        printf("Attempt to start listen on port %d failed.\n", PORT);
+        return;
+    }
 
-    printf("Listening on localhost:8080\n");
+    printf("Listening on localhost:%d\n", PORT);
 
     // Request string, we want the bytes from the network in here
     // Then we're going to pass this address off to the to_path function
@@ -132,53 +204,16 @@ void socket_listen() {
 
         // Get data from req_socket_fd
         ssize_t bytes_read = read(req_socket_fd, req, MAX_REQUEST_BYTES);
-        char *path = to_path(req);
-        if (path == NULL) {
-            write(req_socket_fd, BAD_REQUEST, strlen(BAD_REQUEST));
-            close(req_socket_fd);
-            continue;
-        }
-
-        int fd = open(path, O_RDONLY); // Read file contents
-        if (fd == -1) {
-            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
-            close(req_socket_fd);
-            close(fd);
-            continue;
-        }
-
-        struct stat metadata;
-        if (fstat(fd, &metadata) == -1) {
-            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
-            close(req_socket_fd);
-            close(fd);
-            continue;
-        }
-
-        char *buffer = malloc(metadata.st_size + 1);
-        if (buffer == NULL) {
-            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
-            close(req_socket_fd);
-            close(fd);
-            continue;
-        }
-
-        bytes_read = read(fd, buffer, metadata.st_size + 1);
         if (bytes_read == -1) {
-            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
-            close(req_socket_fd);
-            close(fd);
-            free(buffer);
-            continue;
+            write500(req_socket_fd);
+        } else if (bytes_read > MAX_REQUEST_BYTES) {
+            write(req_socket_fd, ERR_413, strlen(ERR_413));
+        } else {
+            req[bytes_read] = '\0'; // Null-terminate
+            int bytes_written = handle_req(req_socket_fd, req);
+            printf("Bytes written: %d\n", bytes_written);
         }
 
-        char *http_header = "HTTP/1.1 200 OK\n\n";
-        write(req_socket_fd, http_header, strlen(http_header));
-        // Write the requested page to the request socket
-        write(req_socket_fd, buffer, strlen(buffer));
-
-        free(buffer);
-        close(fd);
         close(req_socket_fd);
     }
 }
@@ -197,17 +232,3 @@ int main() {
 
     return 0;
 }
-
-// This declaration will result in a variable on the stack, so inside the main function's memory
-// Declaring like "char *req" would result in it being read-only and on the heap
-// char req1[] = "GET /blog HTTP/1.1\nHost: example.com";
-// printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req1));
-//
-// char req2[] = "GET /blog/ HTTP/1.1\nHost: example.com";
-// printf("Should be \"blog/index.html\": \"%s\"\n", to_path(req2));
-//
-// char req3[] = "GET / HTTP/1.1\nHost: example.com";
-// printf("Should be \"index.html\": \"%s\"\n", to_path(req3));
-//
-// char req4[] = "GET /blog ";
-// printf("Should be \"(null)\": \"%s\"\n", to_path(req4));
