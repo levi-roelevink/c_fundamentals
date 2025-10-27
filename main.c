@@ -8,7 +8,7 @@
 #include <libc.h>
 
 const char *DEFAULT_FILE = "index.html";
-const int MAX_REQUEST_BYTES = 100;
+const int MAX_REQUEST_BYTES = 32768;
 
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
@@ -118,7 +118,7 @@ void socket_listen() {
     // '4' is the number of pending connections that can stack up before we start refusing new ones
     listen(socket_fd, 4);
 
-    printf("Listening on localhost:8080");
+    printf("Listening on localhost:8080\n");
 
     // TODO: Read request from a socket
 
@@ -134,12 +134,25 @@ void socket_listen() {
         // Get data from req_socket_fd
         ssize_t bytes_read = read(req_socket_fd, req, MAX_REQUEST_BYTES);
         char *path = to_path(req);
+        if (path == NULL) {
+            printf("HTTP/1.1 400 Bad Request\n\n");
+        } else {
+            printf("Path from to_path: \"%s\"\n", path);
+        }
         // int fd = open(path, O_RDONLY); // Read file contents
 
         char *response = print_file(path);
-        // Write the requested page to the request socket
-        write(req_socket_fd, response, strlen(response));
-        free(response);
+        if (response != NULL) {
+            printf("Response is not NULL\n");
+            // char *content_type = "Content-Type: text/plain\n\n";
+            char *valid_response = "HTTP/1.1 200 OK\n\n";
+            // Write the requested page to the request socket
+            write(req_socket_fd, valid_response, strlen(valid_response));
+            write(req_socket_fd, "Hello, World!\n", 14);
+
+            write(1, response, strlen(response));
+            free(response);
+        }
 
         // struct stat metadata;
         // fstat(fd, &metadata);
