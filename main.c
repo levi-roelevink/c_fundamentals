@@ -9,6 +9,7 @@
 
 const char *DEFAULT_FILE = "index.html";
 const int MAX_REQUEST_BYTES = 32768;
+const char *SERVER_ERROR = "HTTP/1.1 500 Internal Server Error\n\n";
 
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
@@ -53,6 +54,11 @@ char *to_path(char *req) {
 char *print_file(const char *path) {
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
+        if (errno == ENOENT) {
+            printf("HTTP/1.1 404 Not Found\n\n");
+        } else {
+            printf("HTTP/1.1 500 Internal Server Error\n\n");
+        }
         printf("Error opening file: \"%s\", error code: %d\n", path, errno);
         return NULL;
     }
@@ -63,19 +69,17 @@ char *print_file(const char *path) {
     // The '&' gives the address of the first of those 144 bytes
     // Otherwise the 144 bytes would've been copied to pass as argument
     if (fstat(fd, &metadata) == -1) {
+        printf("HTTP/1.1 500 Internal Server Error\n\n");
         printf("Error retrieving information about file: \"%s\", error code: %d\n", path, errno);
         close(fd);
         return NULL;
     }
 
-    // 👉 Change this to `char *` and malloc(). (malloc comes from <stdlib.h>)
-    //    Hint 1: Don't forget to handle the case where malloc returns NULL!
-    //    Hint 2: Don't forget to `free(buf)` later, to prevent memory leaks.
-    // char buf[metadata.st_size + 1];
     char *buf = malloc(metadata.st_size + 1);
     // TODO: this wil crash if the file size is too large, split the reading up into chunks
 
     if (buf == NULL) {
+        printf("HTTP/1.1 500 Internal Server Error\n\n");
         printf("Error allocating memory on the heap, error code: %d\n", errno);
         close(fd);
         return NULL;
@@ -83,6 +87,7 @@ char *print_file(const char *path) {
 
     ssize_t bytes_read = read(fd, buf, metadata.st_size);
     if (bytes_read == -1) {
+        printf("HTTP/1.1 500 Internal Server Error\n\n");
         printf("Error reading bytes from file descriptor: \"%s\", error code: %d\n", path, errno);
         close(fd);
         free(buf);
@@ -139,7 +144,27 @@ void socket_listen() {
         } else {
             printf("Path from to_path: \"%s\"\n", path);
         }
-        // int fd = open(path, O_RDONLY); // Read file contents
+
+        int fd = open(path, O_RDONLY); // Read file contents
+        if (fd == -1) {
+            printf("Error at fd == -1\n");
+            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
+            printf("%s", SERVER_ERROR);
+            close(req_socket_fd);
+            close(fd);
+            continue;
+        }
+
+        printf("Keeps going!\n");
+        struct stat metadata;
+        if (fstat(fd, &metadata) == -1) {
+            printf("HTTP/1.1 500 Internal Server Error\n\n");
+            close(fd);
+            close(req_socket_fd);
+        }
+
+        // Allocate memory
+        // Check if buffer is null
 
         char *response = print_file(path);
         if (response != NULL) {
@@ -148,7 +173,7 @@ void socket_listen() {
             char *valid_response = "HTTP/1.1 200 OK\n\n";
             // Write the requested page to the request socket
             write(req_socket_fd, valid_response, strlen(valid_response));
-            write(req_socket_fd, "Hello, World!\n", 14);
+            write(req_socket_fd, response, strlen(response));
 
             write(1, response, strlen(response));
             free(response);
