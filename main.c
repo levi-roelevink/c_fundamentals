@@ -19,7 +19,6 @@ const int PORT = 8080;
 // Input: "GET /blog HTTP/1.1..."
 // Goal: "blog/index.html"
 char *to_path(char *req) {
-    printf("Req: %s\n", req);
     char *start, *end;
     const int length = strlen(req);
 
@@ -111,7 +110,6 @@ ssize_t write500(int socket_fd) {
 
 int handle_req(int req_socket_fd, char *req) {
     char *path = to_path(req);
-    printf("Path from to_path: \"%s\"\n", path);
     if (path == NULL) {
         write(req_socket_fd, ERR_400, strlen(ERR_400));
         return -1;
@@ -129,10 +127,13 @@ int handle_req(int req_socket_fd, char *req) {
         extension++;
     }
 
-    if (extension[0] != '.') { // Path does not contain a file extension
+    if (extension[0] != '.') {
+        // Path does not contain a file extension
         extension = NULL;
+    } else if (strcmp(".png", extension) == 0) {
+        printf("Extension %s\n", extension);
     }
-    printf("Extension %s\n", extension);
+    // TODO: just use a switch-case with a default case for when the path does not contain a (valid) file extension
 
     int fd = open(path, O_RDONLY); // Read file contents
     if (fd == -1) {
