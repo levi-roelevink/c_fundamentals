@@ -49,19 +49,6 @@ char *to_path(char *req) {
         return NULL;
     }
 
-    // TODO: check for file extension
-    int path_length = end - start;
-
-    char *extension = req;
-    for (int i = 0; i < path_length - 1; i++) {
-        printf("Char at i(%d): \"%c\"\n", i, start[i]);
-        if (start[i] == '.') { // Path contains a file extension
-            strncpy(extension, &start[i], path_length - i - 1);
-            extension[path_length - i - 1] = '\0';
-            break;
-        }
-    }
-
     // + 1 for size_t to include NULL-terminator
     memcpy(end, DEFAULT_FILE, strlen(DEFAULT_FILE) + 1);
 
@@ -129,6 +116,23 @@ int handle_req(int req_socket_fd, char *req) {
         write(req_socket_fd, ERR_400, strlen(ERR_400));
         return -1;
     }
+
+    int length = strlen(path) - strlen(DEFAULT_FILE);
+
+    char *extension = path;
+    for (int i = 0; i < length - 1; i++) {
+        // Path contains a file extension
+        if (path[i] == '.') {
+            extension[length - i - 1] = '\0';
+            break;
+        }
+        extension++;
+    }
+
+    if (extension[0] != '.') { // Path does not contain a file extension
+        extension = NULL;
+    }
+    printf("Extension %s\n", extension);
 
     int fd = open(path, O_RDONLY); // Read file contents
     if (fd == -1) {
