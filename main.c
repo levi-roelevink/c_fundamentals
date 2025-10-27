@@ -10,6 +10,7 @@
 const char *DEFAULT_FILE = "index.html";
 const int MAX_REQUEST_BYTES = 32768;
 const char *SERVER_ERROR = "HTTP/1.1 500 Internal Server Error\n\n";
+const char *BAD_REQUEST = "HTTP/1.1 400 Bad Request\n\n";
 
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
@@ -101,11 +102,6 @@ char *print_file(const char *path) {
 }
 
 void socket_listen() {
-    // Open a socket
-    // Listen for connections
-    // Read from a socket
-    // Write to a socket
-
     // AF_INET specifies IPv4, SOCK_STREAM specifies TCP, 0 is the protocol number
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -125,8 +121,6 @@ void socket_listen() {
 
     printf("Listening on localhost:8080\n");
 
-    // TODO: Read request from a socket
-
     // Request string, we want the bytes from the network in here
     // Then we're going to pass this address off to the to_path function
     char req[MAX_REQUEST_BYTES + 1];
@@ -140,54 +134,51 @@ void socket_listen() {
         ssize_t bytes_read = read(req_socket_fd, req, MAX_REQUEST_BYTES);
         char *path = to_path(req);
         if (path == NULL) {
-            printf("HTTP/1.1 400 Bad Request\n\n");
-        } else {
-            printf("Path from to_path: \"%s\"\n", path);
+            write(req_socket_fd, BAD_REQUEST, strlen(BAD_REQUEST));
+            close(req_socket_fd);
+            continue;
         }
 
         int fd = open(path, O_RDONLY); // Read file contents
         if (fd == -1) {
-            printf("Error at fd == -1\n");
             write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
-            printf("%s", SERVER_ERROR);
             close(req_socket_fd);
             close(fd);
             continue;
         }
 
-        printf("Keeps going!\n");
         struct stat metadata;
         if (fstat(fd, &metadata) == -1) {
-            printf("HTTP/1.1 500 Internal Server Error\n\n");
-            close(fd);
+            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
             close(req_socket_fd);
+            close(fd);
+            continue;
         }
 
-        // Allocate memory
-        // Check if buffer is null
-
-        char *response = print_file(path);
-        if (response != NULL) {
-            printf("Response is not NULL\n");
-            // char *content_type = "Content-Type: text/plain\n\n";
-            char *valid_response = "HTTP/1.1 200 OK\n\n";
-            // Write the requested page to the request socket
-            write(req_socket_fd, valid_response, strlen(valid_response));
-            write(req_socket_fd, response, strlen(response));
-
-            write(1, response, strlen(response));
-            free(response);
+        char *buffer = malloc(metadata.st_size + 1);
+        if (buffer == NULL) {
+            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
+            close(req_socket_fd);
+            close(fd);
+            continue;
         }
 
-        // struct stat metadata;
-        // fstat(fd, &metadata);
-        // char contents[metadata.st_size + 1];
-        // read(fd, contents, metadata.st_size + 1);
-        // write(1, contents, metadata.st_size + 1);
-        // To make it a real HTTP-server, just write the response to the socket instead of out
+        bytes_read = read(fd, buffer, metadata.st_size + 1);
+        if (bytes_read == -1) {
+            write(req_socket_fd, SERVER_ERROR, strlen(SERVER_ERROR));
+            close(req_socket_fd);
+            close(fd);
+            free(buffer);
+            continue;
+        }
 
+        char *http_header = "HTTP/1.1 200 OK\n\n";
+        write(req_socket_fd, http_header, strlen(http_header));
+        // Write the requested page to the request socket
+        write(req_socket_fd, buffer, strlen(buffer));
 
-        // close(fd);
+        free(buffer);
+        close(fd);
         close(req_socket_fd);
     }
 }
