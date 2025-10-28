@@ -14,6 +14,10 @@ const char *ERR_404 = "HTTP/1.1 404 Not Found\n\n";
 const char *ERR_413 = "HTTP/1.1 413 Content Too Large\n\n";
 const char *ERR_500 = "HTTP/1.1 500 Internal Server Error\n\n";
 const int PORT = 8080;
+const int PNG = 1886283520;
+const int HTML = 1752460652;
+const int JS = 1785921536;
+const int CSS = 1668510464;
 
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
@@ -130,10 +134,27 @@ int handle_req(int req_socket_fd, char *req) {
     if (extension[0] != '.') {
         // Path does not contain a file extension
         extension = NULL;
-    } else if (strcmp(".png", extension) == 0) {
-        printf("Extension %s\n", extension);
+    } else {
+        char *content_type;
+        // Treat the extension as an int so we can compare with the const ints extension types
+        // The first star means "get whatever 4-byte int is at that address", taking it from an address to an actual int
+        switch (*(int *) extension) {
+            case PNG:
+                content_type = "image/png";
+                break;
+            case CSS:
+                content_type = "text/css";
+                break;
+            case HTML:
+                content_type = "text/html";
+                break;
+            case JS:
+                content_type = "application/javascript";
+                break;
+            default:
+                content_type = "application/octet-stream";
+        }
     }
-    // TODO: just use a switch-case with a default case for when the path does not contain a (valid) file extension
 
     int fd = open(path, O_RDONLY); // Read file contents
     if (fd == -1) {
