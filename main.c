@@ -13,11 +13,24 @@ const char *ERR_400 = "HTTP/1.1 400 Bad Request\n\n";
 const char *ERR_404 = "HTTP/1.1 404 Not Found\n\n";
 const char *ERR_413 = "HTTP/1.1 413 Content Too Large\n\n";
 const char *ERR_500 = "HTTP/1.1 500 Internal Server Error\n\n";
-const int PORT = 8080;
-const int PNG = 1886283520;
-const int HTML = 1752460652;
-const int JS = 1785921536;
-const int CSS = 1668510464;
+// const int PORT = 8080;
+// const int PNG = 1886283520;
+// const int HTML = 1752460652;
+// const int JS = 1785921536;
+// const int CSS = 1668510464;
+
+#define PORT 8080
+#define FOURCHAR(a, b, c, d) ((a << 24) | (b << 16) | (c << 8) | (d))
+
+#define HTML FOURCHAR('h', 't', 'm', 'l')
+#define WASM FOURCHAR('w', 'a', 's', 'm')
+#define WEBP FOURCHAR('w', 'e', 'b', 'p')
+#define JPEG FOURCHAR('j', 'p', 'e', 'g')
+#define JPG FOURCHAR('j', 'p', 'g', 0)
+#define CSS FOURCHAR('c', 's', 's', 0)
+#define PNG FOURCHAR('p', 'n', 'g', 0)
+#define GIF FOURCHAR('g', 'i', 'f', 0)
+#define JS FOURCHAR('j', 's', 0, 0)
 
 // Returns the memory address of the actual path
 // Input: "GET /blog HTTP/1.1..."
@@ -112,6 +125,48 @@ ssize_t write500(int socket_fd) {
     return write(socket_fd, ERR_500, strlen(ERR_500));
 }
 
+char *get_content_type(char ext[4]) {
+    printf("ext: %s\n", ext);
+    // Treat the extension as an int so we can compare with the const ints extension types
+    // The first star means "get whatever 4-byte int is at that address", taking it from an address to an actual int
+    int test = *(int *) ext;
+    printf("Test %d\n", test);
+    switch (*(int *) ext) {
+        case HTML:
+            return "text/html";
+        case WASM:
+            return "application/wasm";
+        case WEBP:
+            return "image/webp";
+        case JPEG:
+        case JPG:
+            return "image/jpeg";
+        case CSS:
+            return "text/css";
+        case PNG:
+            return "image/png";
+        case GIF:
+            return "image/gif";
+        case JS:
+            return "application/javascript";
+        default:
+            return "application/octet-stream";
+    }
+}
+
+#define FOURCHAR(a, b, c, d) ((a << 24) | (b << 16) | (c << 8) | (d))
+
+#define HTML FOURCHAR('h', 't', 'm', 'l')
+#define WASM FOURCHAR('w', 'a', 's', 'm')
+#define WEBP FOURCHAR('w', 'e', 'b', 'p')
+#define JPEG FOURCHAR('j', 'p', 'e', 'g')
+#define JPG FOURCHAR('j', 'p', 'g', 0)
+#define CSS FOURCHAR('c', 's', 's', 0)
+#define PNG FOURCHAR('p', 'n', 'g', 0)
+#define GIF FOURCHAR('g', 'i', 'f', 0)
+#define JS FOURCHAR('j', 's', 0, 0)
+
+
 int handle_req(int req_socket_fd, char *req) {
     char *path = to_path(req);
     if (path == NULL) {
@@ -122,39 +177,56 @@ int handle_req(int req_socket_fd, char *req) {
     int length = strlen(path) - strlen(DEFAULT_FILE);
 
     char *extension = path;
+    char *content_type;
     for (int i = 0; i < length - 1; i++) {
         // Path contains a file extension
         if (path[i] == '.') {
+            extension++;
+            extension[length - i - 2] = '\0';
             extension[length - i - 1] = '\0';
+            printf("extension: \"%s\"\n", extension);
+            // content_type = get_content_type(extension);
+
+            // const int HTML = 1752460652;
+
             break;
         }
         extension++;
     }
 
-    if (extension[0] != '.') {
-        // Path does not contain a file extension
-        extension = NULL;
-    } else {
-        char *content_type;
-        // Treat the extension as an int so we can compare with the const ints extension types
-        // The first star means "get whatever 4-byte int is at that address", taking it from an address to an actual int
-        switch (*(int *) extension) {
-            case PNG:
-                content_type = "image/png";
-                break;
-            case CSS:
-                content_type = "text/css";
-                break;
-            case HTML:
-                content_type = "text/html";
-                break;
-            case JS:
-                content_type = "application/javascript";
-                break;
-            default:
-                content_type = "application/octet-stream";
-        }
-    }
+    // if (!content_type) {
+    //     printf("No content type ):\n");
+    // } else {
+    //     printf("Content type: %s\n", content_type);
+    // }
+
+    // if (extension[0] != '.') {
+    //     // Path does not contain a file extension
+    //     extension = NULL;
+    // } else {
+    //     printf("Extension 4: %s\n", extension);
+    //     char *content_type;
+    //     // Treat the extension as an int so we can compare with the const ints extension types
+    //     // The first star means "get whatever 4-byte int is at that address", taking it from an address to an actual int
+    //     switch (*(int *) extension) {
+    //         case PNG:
+    //             content_type = "image/png";
+    //             break;
+    //         case CSS:
+    //             content_type = "text/css";
+    //             break;
+    //         case HTML:
+    //             content_type = "text/html";
+    //             break;
+    //         case JS:
+    //             content_type = "application/javascript";
+    //             break;
+    //         default:
+    //             content_type = "application/octet-stream";
+    //     }
+    //
+    //     printf("Content type: %s\n", content_type);
+    // }
 
     int fd = open(path, O_RDONLY); // Read file contents
     if (fd == -1) {
